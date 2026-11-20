@@ -1,0 +1,25 @@
+# Every option, with its default. Only `strings` (grid mode) or `panels` (drawing mode) is required.
+type: custom:tigo-array-card
+title: Panels
+peak: 460                       # panel Wp – Power colours run from 0 to this
+metric: power                   # button selected on load (see README for the list)
+metrics: [power, performance, daily_energy, voltage_in, temperature, rssi]   # buttons to show (default: all 11)
+history_hours: 24               # sparkline span on load: 0 (off), 3, 24, 72 or 168
+summary: true                   # Total + per-string tiles above the panels
+max_height: 60vh                # cap the drawing's height (any CSS size, or "none")
+aspect: 0.6                     # grid mode only: panel width / height
+prefix: sensor.tigo_ts4_        # panel sensors: <prefix><id>_<metric>
+summary_prefix: sensor.tigo_    # totals: <summary_prefix>installation_power, <summary_prefix>string_<name>_power
+grid_options:
+  columns: full                 # Sections dashboards: fill the section width
+
+# Drawing mode
+view_box: "0 0 1000 700"
+string_colours: { South: "#22c55e", West: "#3b82f6", East: "#ef4444" }
+outline:
+  - "M20 20 H980 V680 H20 Z"
+panels:
+  - { id: south_1, string: South, at: [100, 480, 60, 90] }
+  # optional per panel:
+  #   label: "S1 (chimney)"     text shown on the panel instead of the short name
+  #   barcode: "4-XXXXXXX"      shown in the tooltip / IDs view if Home Assistant doesn't expose it

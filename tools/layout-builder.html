@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tigo Array Card – Layout Builder</title>
+<style>
+  :root { --bg:#111827; --panel:#1f2937; --line:#374151; --text:#e5e7eb; --muted:#9ca3af; --accent:#f59e0b; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--text); display:grid;
+         grid-template-columns: 330px 1fr; height:100vh; }
+  aside { background:var(--panel); padding:14px; overflow:auto; border-right:1px solid var(--line); }
+  main { position:relative; overflow:auto; padding:14px; }
+  h1 { font-size:16px; margin:0 0 4px; } h2 { font-size:13px; margin:16px 0 6px; color:var(--accent); text-transform:uppercase; letter-spacing:.04em; }
+  p.hint { color:var(--muted); font-size:12px; margin:4px 0 8px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:6px 0 2px; }
+  input, select, textarea, button { font:inherit; color:var(--text); background:#111827; border:1px solid var(--line); border-radius:6px; padding:5px 7px; }
+  input[type=number] { width:70px; } input[type=file] { width:100%; }
+  details summary { cursor:pointer; color:var(--muted); font-size:12px; margin-top:8px; } input[type=color] { padding:0; width:34px; height:28px; }
+  button { cursor:pointer; background:#374151; } button:hover { background:#4b5563; }
+  button.on { background:var(--accent); color:#111; border-color:var(--accent); }
+  .row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .tools button { flex:1; }
+  textarea { width:100%; height:240px; font:12px/1.35 ui-monospace, monospace; white-space:pre; }
+  #stage { display:block; background:#0b1220; border:1px solid var(--line); border-radius:6px; max-width:none; user-select:none; touch-action:none; }
+  .pr { fill-opacity:.35; stroke-width:3; cursor:pointer; }
+  .pr.sel { fill-opacity:.65; stroke-dasharray:6 3; }
+  .pl text { font:600 14px system-ui; fill:#fff; paint-order:stroke; stroke:#000; stroke-width:3px; pointer-events:none; text-anchor:middle; dominant-baseline:middle; }
+  .ol { fill:none; stroke:#e5e7eb; stroke-width:3; opacity:.8; }
+  .ol.draft { stroke:var(--accent); stroke-dasharray:5 4; }
+  .str { display:flex; gap:6px; align-items:center; margin:3px 0; }
+  .str input[type=text] { flex:1; min-width:0; }
+  #sel { border:1px solid var(--line); border-radius:6px; padding:8px; margin-top:6px; }
+  .muted { color:var(--muted); }
+  kbd { background:#374151; border-radius:4px; padding:0 4px; font-size:11px; }
+</style>
+</head>
+<body>
+<aside>
+  <h1>Tigo Array Card · Layout Builder</h1>
+  <p class="hint">Draw your panels over a roof plan, then paste the YAML into a <code>custom:tigo-array-card</code> card. Everything runs in your browser; nothing is uploaded.</p>
+
+  <h2>1 · Background</h2>
+  <label>Roof plan image (PNG/JPG, optional)</label>
+  <input type="file" id="img" accept="image/*">
+  <div class="row" style="margin-top:6px">
+    <label style="margin:0">Canvas</label>
+    <input type="number" id="cw" value="1000"> × <input type="number" id="ch" value="700">
+  </div>
+  <label class="row" style="margin-top:6px"><input type="checkbox" id="showImg" checked> show image</label>
+  <details>
+    <summary>Edit an existing layout (paste its YAML)</summary>
+    <textarea id="imp" style="height:110px" placeholder="Paste a tigo-array-card YAML made with this tool (or in the same style)"></textarea>
+    <button id="impGo">Load layout</button> <span id="impMsg" class="muted"></span>
+  </details>
+
+  <h2>2 · Strings</h2>
+  <div id="strings"></div>
+  <button id="addStr">+ Add string</button>
+
+  <h2>3 · Draw</h2>
+  <div class="row tools">
+    <button id="tPanel" class="on" title="Drag to draw a panel">▭ Panel</button>
+    <button id="tLine" title="Click points, double-click or Enter to finish">╱ Roof line</button>
+    <button id="tSel" title="Click a panel to edit, drag to move">⬚ Select</button>
+  </div>
+  <p class="hint">Panel: drag a rectangle. Roof line: click points, <kbd>Enter</kbd>/double-click to finish, <kbd>Esc</kbd> to cancel. <kbd>Del</kbd> removes the selected panel.</p>
+  <label>Next panel: string &amp; id pattern (<code>{n}</code> = number)</label>
+  <div class="row">
+    <select id="curStr"></select>
+    <input type="text" id="pattern" value="south_{n}" style="flex:1;min-width:0">
+    <input type="number" id="nextN" value="1" title="next number">
+  </div>
+
+  <div id="sel" class="muted">No panel selected.</div>
+
+  <h2>4 · Options</h2>
+  <div class="row"><label style="margin:0">Title</label><input type="text" id="title" value="Roof" style="flex:1"></div>
+  <div class="row" style="margin-top:6px"><label style="margin:0">Panel peak (W)</label><input type="number" id="peak" value="400"></div>
+  <div class="row" style="margin-top:6px"><label style="margin:0">Snap grid</label><input type="number" id="snap" value="1" min="1"></div>
+
+  <h2>5 · YAML</h2>
+  <textarea id="out" readonly></textarea>
+  <div class="row" style="margin-top:6px">
+    <button id="copy">Copy YAML</button>
+    <button id="undo">Undo</button>
+    <button id="clear">Clear all</button>
+  </div>
+  <p class="hint">Tip: ids must match your PyTap sensors, e.g. <code>sensor.tigo_ts4_<b>south_1</b>_power</code> → <code>south_1</code>.</p>
+</aside>
+<main>
+  <svg id="stage" xmlns="http://www.w3.org/2000/svg"></svg>
+</main>
+
+<script>
+"use strict";
+// ---------- state ----------
+const S = {
+  w: 1000, h: 700, img: null, showImg: true,
+  strings: [ { name: "South", colour: "#22c55e" }, { name: "West", colour: "#3b82f6" }, { name: "East", colour: "#ef4444" } ],
+  panels: [], lines: [], tool: "panel", sel: -1, draft: null, history: [],
+  title: "Roof", peak: 400, snap: 1, cur: "South", pattern: "south_{n}", nextN: 1,
+};
+const $ = (id) => document.getElementById(id);
+const svgNS = "http://www.w3.org/2000/svg";
+const round = (v) => Math.round(v / S.snap) * S.snap;
+const colourOf = (name) => (S.strings.find((s) => s.name === name) || {}).colour || "#999";
+const shortName = (id) => {
+  const m = String(id).match(/^([a-z]+)(_middle)?_0*(\d+)$/i);
+  return m ? m[1][0].toUpperCase() + (m[2] ? "M" : "") + m[3] : id;
+};
+const snapshot = () => { S.history.push(JSON.stringify({ p: S.panels, l: S.lines })); if (S.history.length > 100) S.history.shift(); };
+
+// ---------- YAML ----------
+function toYaml() {
+  const q = (t) => (/^[A-Za-z0-9_.-]+$/.test(t) ? t : JSON.stringify(t));
+  const L = [];
+  L.push("type: custom:tigo-array-card");
+  L.push(`title: ${q(S.title)}`);
+  L.push(`peak: ${Number(S.peak) || 400}`);
+  L.push("metric: power");
+  L.push(`view_box: "0 0 ${S.w} ${S.h}"`);
+  L.push("grid_options:");
+  L.push("  columns: full");
+  L.push("string_colours:");
+  S.strings.forEach((s) => L.push(`  ${q(s.name)}: "${s.colour}"`));
+  if (S.lines.length) {
+    L.push("outline:");
+    S.lines.forEach((pts) => L.push(`  - "M${pts.map((p) => p.join(" ")).join(" L")}"`));
+  }
+  L.push("panels:");
+  const used = S.strings.map((s) => s.name);
+  const order = [...S.panels].sort((a, b) => used.indexOf(a.string) - used.indexOf(b.string));
+  let last = null;
+  order.forEach((p) => {
+    if (p.string !== last) { L.push(`  # ${p.string}`); last = p.string; }
+    L.push(`  - { id: ${q(p.id)}, string: ${q(p.string)}, at: [${p.x}, ${p.y}, ${p.w}, ${p.h}] }`);
+  });
+  return L.join("\n") + "\n";
+}
+
+// ---------- render ----------
+function render() {
+  const st = $("stage");
+  st.setAttribute("viewBox", `0 0 ${S.w} ${S.h}`);
+  st.setAttribute("width", S.w); st.setAttribute("height", S.h);
+  st.innerHTML = "";
+  if (S.img && S.showImg) {
+    const im = document.createElementNS(svgNS, "image");
+    im.setAttribute("href", S.img); im.setAttribute("x", 0); im.setAttribute("y", 0);
+    im.setAttribute("width", S.w); im.setAttribute("height", S.h); im.setAttribute("opacity", .55);
+    st.appendChild(im);
+  }
+  S.lines.forEach((pts) => st.appendChild(path(pts, "ol")));
+  if (S.draft && S.draft.type === "line" && S.draft.pts.length) {
+    st.appendChild(path(S.draft.cursor ? [...S.draft.pts, S.draft.cursor] : S.draft.pts, "ol draft"));
+  }
+  S.panels.forEach((p, i) => {
+    const g = document.createElementNS(svgNS, "g"); g.setAttribute("class", "pl");
+    const r = document.createElementNS(svgNS, "rect");
+    Object.entries({ x: p.x, y: p.y, width: p.w, height: p.h, rx: 3, fill: colourOf(p.string), stroke: colourOf(p.string) })
+      .forEach(([k, v]) => r.setAttribute(k, v));
+    r.setAttribute("class", "pr" + (i === S.sel ? " sel" : "")); r.dataset.i = i;
+    const t = document.createElementNS(svgNS, "text");
+    t.setAttribute("x", p.x + p.w / 2); t.setAttribute("y", p.y + p.h / 2);
+    t.style.fontSize = Math.max(9, Math.min(16, Math.min(p.w, p.h) * 0.3)) + "px";
+    t.textContent = shortName(p.id);
+    g.append(r, t); st.appendChild(g);
+  });
+  if (S.draft && S.draft.type === "panel") {
+    const d = S.draft, r = document.createElementNS(svgNS, "rect");
+    Object.entries({ x: Math.min(d.x0, d.x1), y: Math.min(d.y0, d.y1), width: Math.abs(d.x1 - d.x0), height: Math.abs(d.y1 - d.y0),
+      fill: "none", stroke: "#f59e0b", "stroke-width": 2, "stroke-dasharray": "5 4" }).forEach(([k, v]) => r.setAttribute(k, v));
+    st.appendChild(r);
+  }
+  $("out").value = toYaml();
+  renderSel();
+}
+function path(pts, cls) {
+  const p = document.createElementNS(svgNS, "path");
+  p.setAttribute("d", "M" + pts.map((q) => q.join(" ")).join(" L")); p.setAttribute("class", cls); return p;
+}
+function renderStrings() {
+  const box = $("strings"); box.innerHTML = "";
+  S.strings.forEach((s, i) => {
+    const d = document.createElement("div"); d.className = "str";
+    d.innerHTML = `<input type="color" value="${s.colour}"><input type="text" value="${s.name}"><button title="remove">✕</button>`;
+    const [c, n, x] = d.children;
+    c.oninput = () => { s.colour = c.value; render(); };
+    n.onchange = () => {
+      const old = s.name; s.name = n.value.trim() || old;
+      S.panels.forEach((p) => { if (p.string === old) p.string = s.name; });
+      if (S.cur === old) S.cur = s.name;
+      renderStrings(); render();
+    };
+    x.onclick = () => { if (S.strings.length > 1) { S.strings.splice(i, 1); renderStrings(); render(); } };
+    box.appendChild(d);
+  });
+  const cs = $("curStr"); cs.innerHTML = S.strings.map((s) => `<option${s.name === S.cur ? " selected" : ""}>${s.name}</option>`).join("");
+  if (!S.strings.some((s) => s.name === S.cur)) S.cur = S.strings[0].name;
+}
+function renderSel() {
+  const box = $("sel"), p = S.panels[S.sel];
+  if (!p) { box.className = "muted"; box.textContent = "No panel selected."; return; }
+  box.className = "";
+  box.innerHTML = `
+    <div class="row"><b>Selected panel</b></div>
+    <label>id</label><input type="text" id="sId" value="${p.id}" style="width:100%">
+    <label>string</label><select id="sStr">${S.strings.map((s) => `<option${s.name === p.string ? " selected" : ""}>${s.name}</option>`).join("")}</select>
+    <label>x, y, width, height</label>
+    <div class="row"><input type="number" id="sx" value="${p.x}"><input type="number" id="sy" value="${p.y}"><input type="number" id="sw" value="${p.w}"><input type="number" id="sh" value="${p.h}"></div>
+    <label>Repeat this panel</label>
+    <div class="row"><input type="number" id="rn" value="3" min="1" title="copies"> copies,
+      gap <input type="number" id="rg" value="4" title="gap"> <select id="rd"><option value="r">→ right</option><option value="d">↓ down</option><option value="l">← left</option><option value="u">↑ up</option></select>
+      <button id="rgo">Repeat</button></div>
+    <div class="row" style="margin-top:8px"><button id="sDel">Delete</button></div>`;
+  const upd = () => { snapshot(); p.id = $("sId").value.trim() || p.id; p.string = $("sStr").value;
+    ["x", "y", "w", "h"].forEach((k) => { const v = Number($("s" + k).value); if (Number.isFinite(v)) p[k] = v; }); render(); };
+  ["sId", "sStr", "sx", "sy", "sw", "sh"].forEach((id) => ($(id).onchange = upd));
+  $("sDel").onclick = () => { snapshot(); S.panels.splice(S.sel, 1); S.sel = -1; render(); };
+  $("rgo").onclick = () => repeat(S.sel, Number($("rn").value), Number($("rg").value), $("rd").value);
+}
+
+// ---------- actions ----------
+function nextId() {
+  const id = S.pattern.includes("{n}") ? S.pattern.replace("{n}", S.nextN) : S.pattern + "_" + S.nextN;
+  S.nextN++; $("nextN").value = S.nextN; return id;
+}
+function addPanel(x, y, w, h) {
+  snapshot();
+  S.panels.push({ id: nextId(), string: S.cur, x: round(x), y: round(y), w: round(w), h: round(h) });
+  S.sel = S.panels.length - 1; render();
+}
+function repeat(i, n, gap, dir) {
+  const p = S.panels[i]; if (!p || !(n > 0)) return;
+  snapshot();
+  for (let k = 1; k <= n; k++) {
+    const dx = dir === "r" ? (p.w + gap) * k : dir === "l" ? -(p.w + gap) * k : 0;
+    const dy = dir === "d" ? (p.h + gap) * k : dir === "u" ? -(p.h + gap) * k : 0;
+    S.panels.push({ id: nextId(), string: p.string, x: p.x + dx, y: p.y + dy, w: p.w, h: p.h });
+  }
+  render();
+}
+function finishLine() {
+  if (S.draft && S.draft.type === "line" && S.draft.pts.length > 1) { snapshot(); S.lines.push(S.draft.pts); }
+  S.draft = null; render();
+}
+function setTool(t) {
+  S.tool = t; S.draft = null;
+  [["tPanel", "panel"], ["tLine", "line"], ["tSel", "select"]].forEach(([id, v]) => $(id).classList.toggle("on", v === t));
+  render();
+}
+
+// ---------- pointer ----------
+function pt(ev) {
+  const st = $("stage"), r = st.getBoundingClientRect();
+  return [round(((ev.clientX - r.left) / r.width) * S.w), round(((ev.clientY - r.top) / r.height) * S.h)];
+}
+let drag = null;
+$("stage").addEventListener("pointerdown", (ev) => {
+  const [x, y] = pt(ev), hit = ev.target.dataset && ev.target.dataset.i;
+  if (S.tool === "panel") { S.draft = { type: "panel", x0: x, y0: y, x1: x, y1: y }; $("stage").setPointerCapture(ev.pointerId); }
+  else if (S.tool === "line") {
+    if (!S.draft) S.draft = { type: "line", pts: [] };
+    S.draft.pts.push([x, y]); render();
+  } else {
+    S.sel = hit !== undefined ? Number(hit) : -1;
+    if (S.sel >= 0) { snapshot(); const p = S.panels[S.sel]; drag = { dx: x - p.x, dy: y - p.y }; $("stage").setPointerCapture(ev.pointerId); }
+    render();
+  }
+});
+$("stage").addEventListener("pointermove", (ev) => {
+  const [x, y] = pt(ev);
+  if (S.draft && S.draft.type === "panel") { S.draft.x1 = x; S.draft.y1 = y; render(); }
+  else if (S.draft && S.draft.type === "line") { S.draft.cursor = [x, y]; render(); }
+  else if (drag && S.sel >= 0) { const p = S.panels[S.sel]; p.x = round(x - drag.dx); p.y = round(y - drag.dy); render(); }
+});
+$("stage").addEventListener("pointerup", () => {
+  if (S.draft && S.draft.type === "panel") {
+    const d = S.draft; S.draft = null;
+    const w = Math.abs(d.x1 - d.x0), h = Math.abs(d.y1 - d.y0);
+    if (w > 4 && h > 4) addPanel(Math.min(d.x0, d.x1), Math.min(d.y0, d.y1), w, h); else render();
+  }
+  drag = null;
+});
+$("stage").addEventListener("dblclick", () => { if (S.tool === "line") { if (S.draft) S.draft.pts.pop(); finishLine(); } });
+document.addEventListener("keydown", (ev) => {
+  if (ev.target && ev.target.matches && ev.target.matches("input, textarea, select")) return;
+  if (ev.key === "Enter") finishLine();
+  if (ev.key === "Escape") { S.draft = null; render(); }
+  if ((ev.key === "Delete" || ev.key === "Backspace") && S.sel >= 0) { snapshot(); S.panels.splice(S.sel, 1); S.sel = -1; render(); }
+  if ((ev.ctrlKey || ev.metaKey) && ev.key === "z") undo();
+});
+function undo() { const h = S.history.pop(); if (!h) return; const o = JSON.parse(h); S.panels = o.p; S.lines = o.l; S.sel = -1; render(); }
+
+// ---------- controls ----------
+$("img").onchange = (ev) => {
+  const f = ev.target.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    const im = new Image();
+    im.onload = () => { S.img = rd.result; S.w = im.naturalWidth; S.h = im.naturalHeight; $("cw").value = S.w; $("ch").value = S.h; render(); };
+    im.src = rd.result;
+  };
+  rd.readAsDataURL(f);
+};
+$("cw").onchange = () => { S.w = Number($("cw").value) || S.w; render(); };
+$("ch").onchange = () => { S.h = Number($("ch").value) || S.h; render(); };
+$("showImg").onchange = () => { S.showImg = $("showImg").checked; render(); };
+$("addStr").onclick = () => { const cols = ["#a855f7", "#14b8a6", "#f97316", "#eab308", "#ec4899"];
+  S.strings.push({ name: "String" + (S.strings.length + 1), colour: cols[S.strings.length % cols.length] }); renderStrings(); render(); };
+$("curStr").onchange = () => { S.cur = $("curStr").value; const base = S.cur.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  S.pattern = base + "_{n}"; $("pattern").value = S.pattern;
+  const nums = S.panels.filter((p) => p.string === S.cur).map((p) => Number((p.id.match(/(\d+)$/) || [])[1]) || 0);
+  S.nextN = (nums.length ? Math.max(...nums) : 0) + 1; $("nextN").value = S.nextN; };
+$("pattern").onchange = () => { S.pattern = $("pattern").value.trim() || S.pattern; };
+$("nextN").onchange = () => { S.nextN = Number($("nextN").value) || 1; };
+$("title").onchange = () => { S.title = $("title").value; render(); };
+$("peak").onchange = () => { S.peak = Number($("peak").value) || 400; render(); };
+$("snap").onchange = () => { S.snap = Math.max(1, Number($("snap").value) || 1); };
+$("tPanel").onclick = () => setTool("panel");
+$("tLine").onclick = () => setTool("line");
+$("tSel").onclick = () => setTool("select");
+$("undo").onclick = undo;
+$("clear").onclick = () => { if (confirm("Remove all panels and lines?")) { snapshot(); S.panels = []; S.lines = []; S.sel = -1; render(); } };
+$("copy").onclick = async () => {
+  try { await navigator.clipboard.writeText($("out").value); $("copy").textContent = "Copied ✓"; }
+  catch (e) { $("out").select(); document.execCommand("copy"); $("copy").textContent = "Copied ✓"; }
+  setTimeout(() => ($("copy").textContent = "Copy YAML"), 1500);
+};
+
+// ---------- import ----------
+function pathToPoints(d) {
+  const out = [];
+  String(d).split(/(?=M)/).forEach((part) => {
+    const t = part.match(/[MLHVZ]|-?\d+(?:\.\d+)?/g) || [];
+    const pts = []; let x = 0, y = 0, cmd = null, i = 0;
+    while (i < t.length) {
+      if (/[MLHVZ]/.test(t[i])) { cmd = t[i++]; if (cmd === "Z") { if (pts.length) pts.push([...pts[0]]); continue; } }
+      if (cmd === "M" || cmd === "L") { x = +t[i]; y = +t[i + 1]; i += 2; }
+      else if (cmd === "H") x = +t[i++];
+      else if (cmd === "V") y = +t[i++];
+      else { i++; continue; }
+      pts.push([x, y]);
+    }
+    if (pts.length > 1) out.push(pts);
+  });
+  return out;
+}
+function importYaml(txt) {
+  const vb = txt.match(/view_box:\s*"?\s*(-?[\d.]+)\s+(-?[\d.]+)\s+([\d.]+)\s+([\d.]+)/);
+  const panels = [];
+  const re = /-\s*\{([^}]*)\}/g; let m;
+  while ((m = re.exec(txt))) {
+    const b = m[1];
+    const id = (b.match(/\bid:\s*"?([^,"\s}]+)/) || [])[1];
+    const str = (b.match(/\bstring:\s*"?([^,"}]+?)"?\s*(,|$)/) || [])[1];
+    const at = (b.match(/\bat:\s*\[([^\]]+)\]/) || [])[1];
+    if (id && at) { const [x, y, w, h] = at.split(",").map(Number); panels.push({ id, string: (str || "South").trim(), x, y, w, h }); }
+  }
+  if (!panels.length) return "No panels found (expected lines like - { id: south_1, string: South, at: [x, y, w, h] }).";
+  snapshot();
+  const ox = vb ? +vb[1] : 0, oy = vb ? +vb[2] : 0;
+  if (vb) { S.w = +vb[3]; S.h = +vb[4]; $("cw").value = S.w; $("ch").value = S.h; }
+  S.panels = panels.map((p) => ({ ...p, x: p.x - ox, y: p.y - oy }));
+  const cols = txt.match(/string_colours:[ \t]*\n((?:[ \t]+[^\n]+:[ \t]*"?#[0-9a-fA-F]{3,8}"?[ \t]*(?:\n|$))+)/);
+  if (cols) {
+    S.strings = [...cols[1].matchAll(/^[ \t]+"?([^:"\n]+)"?:[ \t]*"?(#[0-9a-fA-F]{3,8})/gm)].map((c) => ({ name: c[1].trim(), colour: c[2] }));
+  }
+  [...new Set(panels.map((p) => p.string))].forEach((n, i) => {
+    if (!S.strings.some((s) => s.name === n)) S.strings.push({ name: n, colour: ["#22c55e", "#3b82f6", "#ef4444", "#a855f7"][i % 4] });
+  });
+  const ol = txt.match(/outline:[ \t]*\n((?:[ \t]+(?:-[ \t]*"[^"\n]*"|#[^\n]*)[ \t]*(?:\n|$))+)/);
+  S.lines = ol ? [...ol[1].matchAll(/-\s*"([^"]+)"/g)].flatMap((x) => pathToPoints(x[1]))
+    .map((pts) => pts.map(([x, y]) => [x - ox, y - oy])) : [];
+  const t = txt.match(/^title:\s*"?([^"\n]+)"?/m); if (t) { S.title = t[1].trim(); $("title").value = S.title; }
+  const pk = txt.match(/^peak:\s*(\d+)/m); if (pk) { S.peak = +pk[1]; $("peak").value = S.peak; }
+  S.sel = -1; renderStrings(); render();
+  return `Loaded ${panels.length} panels and ${S.lines.length} roof lines.`;
+}
+$("impGo").onclick = () => { $("impMsg").textContent = importYaml($("imp").value); };
+
+// test hook (used by the repository's automated check; harmless otherwise)
+window.__builder = { S, addPanel, repeat, finishLine, toYaml, setTool, importYaml };
+renderStrings(); render();
+</script>
+</body>
+</html>

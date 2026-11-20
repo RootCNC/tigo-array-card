@@ -1,0 +1,17 @@
+{# Paste into Home Assistant: Settings -> Tools (Developer tools) -> Template.
+   Lists every PyTap and FoxESS entity with its friendly name and current value. #}
+
+### PyTap
+{% for e in integration_entities('pytap') | sort %}
+{{ e }} | {{ state_attr(e, 'friendly_name') }} | {{ states(e) }} {{ state_attr(e, 'unit_of_measurement') or '' }}
+{%- endfor %}
+
+### FoxESS (foxess_modbus)
+{% for e in integration_entities('foxess_modbus') | sort %}
+{{ e }} | {{ state_attr(e, 'friendly_name') }} | {{ states(e) }} {{ state_attr(e, 'unit_of_measurement') or '' }}
+{%- endfor %}
+
+### Panel ids for the card (the part between sensor.tigo_ts4_ and _power)
+{% for e in integration_entities('pytap') | select('match', 'sensor\.tigo_ts4_.*_power$') | sort %}
+{{ e | replace('sensor.tigo_ts4_', '') | replace('_power', '') }}
+{%- endfor %}

@@ -1,0 +1,77 @@
+# What the solar + battery system saved you, priced at the live tariff rate when the energy was used.
+#
+#   cost without system = everything the house used x rate at that moment
+#   actual import cost  = everything imported from the grid x rate at that moment
+#   savings             = the difference
+#
+# This is right for battery timing (solar stored at midday and used at 6 pm is valued at the 6 pm rate)
+# and it charges you for any overnight grid top-ups. Export income is not included – set
+# "Export compensation" in the Energy dashboard for that.
+#
+# Replace RATE_SENSOR below with your tariff's current-rate sensor, e.g. from the Octopus Energy integration:
+#   sensor.octopus_energy_electricity_<meter serial>_<mpan>_current_rate
+# Entity names below are from foxess_modbus; swap in your own lifetime kWh sensors if different.
+#
+# Merge the template: and utility_meter: sections into configuration.yaml, Check configuration, then a FULL restart
+# (utility_meter only loads on a restart).
+
+template:
+  - trigger:
+      - trigger: state
+        entity_id: sensor.load_power_total            # house consumption, lifetime kWh
+    sensor:
+      - name: Cost without system total
+        unique_id: cost_without_system_total
+        unit_of_measurement: GBP
+        device_class: monetary
+        state_class: total
+        state: >
+          {% set old = trigger.from_state.state | float(none) %}
+          {% set new = trigger.to_state.state | float(none) %}
+          {% set rate = states('RATE_SENSOR') | float(0) %}
+          {% set prev = this.state | float(0) %}
+          {% if old is not none and new is not none and new > old and (new - old) < 5 %}
+            {{ (prev + (new - old) * rate) | round(4) }}
+          {% else %}
+            {{ prev }}
+          {% endif %}
+
+  - trigger:
+      - trigger: state
+        entity_id: sensor.grid_consumption_energy_total   # grid import, lifetime kWh
+    sensor:
+      - name: Grid import cost total
+        unique_id: grid_import_cost_total
+        unit_of_measurement: GBP
+        device_class: monetary
+        state_class: total
+        state: >
+          {% set old = trigger.from_state.state | float(none) %}
+          {% set new = trigger.to_state.state | float(none) %}
+          {% set rate = states('RATE_SENSOR') | float(0) %}
+          {% set prev = this.state | float(0) %}
+          {% if old is not none and new is not none and new > old and (new - old) < 5 %}
+            {{ (prev + (new - old) * rate) | round(4) }}
+          {% else %}
+            {{ prev }}
+          {% endif %}
+
+  - sensor:
+      - name: System savings today
+        unique_id: system_savings_today
+        unit_of_measurement: GBP
+        device_class: monetary
+        state: >
+          {{ (states('sensor.cost_without_system_daily') | float(0)
+              - states('sensor.grid_import_cost_daily') | float(0)) | round(2) }}
+
+utility_meter:
+  cost_without_system_daily:
+    source: sensor.cost_without_system_total
+    cycle: daily
+  grid_import_cost_daily:
+    source: sensor.grid_import_cost_total
+    cycle: daily
+
+# Note: "System savings today" can go negative overnight while a battery charges from the grid,
+# then recovers during the day and evening. Judge it at the end of the day.

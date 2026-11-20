@@ -1,0 +1,67 @@
+# Drawing mode – an exact roof plan (this is the reference installation in docs/reference-system.md:
+# 27 panels on three roof faces). Use it as a template, or make your own with tools/layout-builder.html.
+#
+# Coordinates: view_box sets the drawing's coordinate space; each panel is at: [x, y, width, height].
+# Outline entries are SVG path strings (M = move to, H/V = horizontal/vertical line to, L = line to, Z = close).
+type: custom:tigo-array-card
+title: Roof
+peak: 460
+metric: power
+grid_options:
+  columns: full      # fill the section width
+view_box: "10 95 950 570"
+string_colours:
+  South: "#22c55e"
+  West: "#3b82f6"
+  East: "#ef4444"
+outline:
+  # building footprint + eaves line
+  - "M20 115 H950 V655 H20 Z"
+  - "M78 475 H950"
+  # hips / valleys
+  - "M252 115 V475"
+  - "M717 115 V475"
+  - "M20 335 L252 475 L377 400"
+  - "M950 335 L717 475 L595 400"
+  # centre flat section
+  - "M377 115 V400 H595 V115"
+  # chimneys / boxes
+  - "M20 418 H78 V528 H20"
+  - "M888 475 V403 H950"
+  # dormers
+  - "M157 655 V612 L205 578 L252 612 V655 M205 578 V655"
+  - "M413 655 V612 L461 578 L510 612 V655 M461 578 V655"
+  - "M718 655 V612 L766 578 L815 612 V655 M766 578 V655"
+panels:
+  # ── West (blue) – left wing ──
+  - { id: west_1, string: West, at: [43, 137, 93, 62] }
+  - { id: west_2, string: West, at: [139, 137, 93, 62] }
+  - { id: west_3, string: West, at: [43, 204, 93, 62] }
+  - { id: west_4, string: West, at: [139, 204, 93, 62] }
+  - { id: west_5, string: West, at: [139, 271, 93, 62] }
+  # ── East middle (red) – centre-left column ──
+  - { id: east_middle_01, string: East, at: [267, 137, 93, 62] }
+  - { id: east_middle_02, string: East, at: [267, 204, 93, 62] }
+  - { id: east_middle_03, string: East, at: [267, 271, 93, 62] }
+  # ── West middle (blue) – centre-right column ──
+  - { id: west_middle_01, string: West, at: [609, 137, 93, 62] }
+  - { id: west_middle_02, string: West, at: [609, 204, 93, 62] }
+  - { id: west_middle_03, string: West, at: [609, 271, 93, 62] }
+  # ── East (red) – right wing ──
+  - { id: east_1, string: East, at: [734, 137, 93, 62] }
+  - { id: east_2, string: East, at: [829, 137, 93, 62] }
+  - { id: east_3, string: East, at: [734, 204, 93, 62] }
+  - { id: east_4, string: East, at: [829, 204, 93, 62] }
+  - { id: east_5, string: East, at: [734, 271, 93, 62] }
+  # ── South (green) – main roof ──
+  - { id: south_1, string: South, at: [118, 485, 63, 92] }
+  - { id: south_2, string: South, at: [186, 485, 63, 92] }
+  - { id: south_3, string: South, at: [254, 485, 63, 92] }
+  - { id: south_4, string: South, at: [322, 485, 63, 92] }
+  - { id: south_5, string: South, at: [390, 485, 63, 92] }
+  - { id: south_6, string: South, at: [458, 485, 63, 92] }
+  - { id: south_7, string: South, at: [526, 485, 63, 92] }
+  - { id: south_8, string: South, at: [594, 485, 63, 92] }
+  - { id: south_9, string: South, at: [662, 485, 63, 92] }
+  - { id: south_10, string: South, at: [730, 485, 63, 92] }
+  - { id: south_11, string: South, at: [798, 485, 63, 92] }

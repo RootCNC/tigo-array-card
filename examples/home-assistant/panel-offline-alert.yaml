@@ -1,0 +1,33 @@
+# Automation: notify when a Tigo optimiser stops reporting during daylight.
+# Settings -> Automations -> Create -> Edit in YAML, paste, save.
+# Catches both "unavailable" panels and panels whose sensor hasn't been updated for an hour.
+alias: Tigo – optimiser not reporting
+description: Warn when a panel has sent no data for over an hour while the sun is up
+mode: single
+triggers:
+  - trigger: time_pattern
+    minutes: "/30"
+conditions:
+  - condition: numeric_state
+    entity_id: sun.sun
+    attribute: elevation
+    above: 10
+actions:
+  - variables:
+      stale: >
+        {{ states.sensor
+           | selectattr('entity_id', 'match', 'sensor\.tigo_ts4_.*_power$')
+           | selectattr('last_reported', 'lt', now() - timedelta(hours=1))
+           | map(attribute='name') | list }}
+  - choose:
+      - conditions: "{{ stale | count > 0 }}"
+        sequence:
+          - action: persistent_notification.create
+            data:
+              notification_id: tigo_stale_panels
+              title: Tigo optimisers not reporting
+              message: "No data for over an hour from: {{ stale | join(', ') }}"
+    default:
+      - action: persistent_notification.dismiss
+        data:
+          notification_id: tigo_stale_panels

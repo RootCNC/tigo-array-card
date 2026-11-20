@@ -1,0 +1,56 @@
+# Freeze Solcast's forecast at fixed times and store it next to what you actually generated,
+# so you can learn how accurate Solcast is for your roof (useful before automating night charging).
+#
+# Add under `template:` in configuration.yaml (don't add a second `template:` line if you already have one).
+# Then: Settings -> Tools -> YAML -> Check configuration, and do a full restart.
+#
+# Times follow local clock time (BST/GMT handled automatically).
+#   03:00 – before sunrise all year
+#   23:10 – after dark all year, before the midnight reset of daily totals
+#   23:15 – after the actual has been captured
+# Replace sensor.solar_energy_today with your own "solar generated today" sensor if you don't use foxess_modbus.
+
+template:
+  - trigger:
+      - trigger: time
+        at: "03:00:00"
+    sensor:
+      - name: Solcast forecast at dawn
+        unique_id: solcast_forecast_dawn
+        unit_of_measurement: kWh
+        state_class: measurement
+        state: "{{ states('sensor.solcast_pv_forecast_forecast_today') | float(0) | round(2) }}"
+
+  - trigger:
+      - trigger: time
+        at: "23:10:00"
+    sensor:
+      - name: Solar actual daily
+        unique_id: solar_actual_daily
+        unit_of_measurement: kWh
+        state_class: measurement
+        state: "{{ states('sensor.solar_energy_today') | float(0) | round(2) }}"
+      - name: Solcast accuracy vs dawn
+        unique_id: solcast_accuracy_dawn
+        unit_of_measurement: "%"
+        state_class: measurement
+        state: >
+          {% set f = states('sensor.solcast_forecast_at_dawn') | float(0) %}
+          {{ (states('sensor.solar_energy_today') | float(0) / f * 100) | round(0) if f > 0 else none }}
+      - name: Solcast accuracy vs night before
+        unique_id: solcast_accuracy_night_before
+        unit_of_measurement: "%"
+        state_class: measurement
+        state: >
+          {% set f = states('sensor.solcast_forecast_night_before') | float(0) %}
+          {{ (states('sensor.solar_energy_today') | float(0) / f * 100) | round(0) if f > 0 else none }}
+
+  - trigger:
+      - trigger: time
+        at: "23:15:00"
+    sensor:
+      - name: Solcast forecast night before
+        unique_id: solcast_forecast_night_before
+        unit_of_measurement: kWh
+        state_class: measurement
+        state: "{{ states('sensor.solcast_pv_forecast_forecast_tomorrow') | float(0) | round(2) }}"

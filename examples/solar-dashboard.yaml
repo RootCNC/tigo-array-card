@@ -1,0 +1,914 @@
+# Complete solar dashboard – FoxESS hybrid inverter (foxess_modbus) + Tigo TS4 (PyTap) + Solcast forecast
+# Four tabs: Overview (power flow, battery, today, forecast), Inverter, Panels (tigo-array-card), Diagnostics.
+#
+# Needs, from HACS (Frontend): tigo-array-card, apexcharts-card, power-flow-card-plus, auto-entities
+# Integrations: foxess_modbus, pytap, solcast_solar
+# Entity ids are the integrations' defaults – check yours with examples/home-assistant/list-entities.jinja.
+#
+# Install: Settings -> Dashboards -> Add dashboard -> New from scratch -> open it ->
+#          pencil -> three dots -> Raw configuration editor -> replace everything with this file -> Save.
+
+title: Solar
+views:
+  - title: Overview
+    path: overview
+    icon: mdi:home-lightning-bolt
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        column_span: 2
+        cards:
+          - type: heading
+            heading: Energy flow
+            heading_style: title
+            icon: mdi:transmission-tower
+          - type: custom:power-flow-card-plus
+            grid_options: &id001
+              columns: full
+            watt_threshold: 1000
+            kw_decimals: 2
+            clickable_entities: true
+            entities:
+              solar:
+                entity: sensor.foxess_modbus_pv_power
+                display_zero_state: true
+              home:
+                entity: sensor.load_power
+              battery:
+                entity:
+                  consumption: sensor.battery_discharge
+                  production: sensor.battery_charge
+                state_of_charge: sensor.battery_soc
+              grid:
+                entity:
+                  consumption: sensor.grid_consumption
+                  production: sensor.feed_in
+          - type: custom:apexcharts-card
+            grid_options: *id001
+            graph_span: 24h
+            span:
+              start: day
+            header:
+              show: true
+              title: Power today
+              show_states: true
+              colorize_states: true
+            now:
+              show: true
+              label: Now
+            apex_config:
+              chart:
+                height: 320
+              legend:
+                show: false
+              tooltip:
+                x:
+                  format: HH:mm
+            yaxis:
+              - id: kw
+                decimals: 1
+                apex_config:
+                  title:
+                    text: kW
+              - id: soc
+                opposite: true
+                min: 0
+                max: 100
+                decimals: 0
+                apex_config:
+                  title:
+                    text: SoC %
+            series:
+              - entity: sensor.foxess_modbus_pv_power
+                name: Solar
+                yaxis_id: kw
+                type: area
+                color: '#F59E0B'
+                opacity: 0.35
+                stroke_width: 2
+                group_by:
+                  func: avg
+                  duration: 5min
+              - entity: sensor.load_power
+                name: House
+                yaxis_id: kw
+                type: line
+                color: '#3B82F6'
+                stroke_width: 2
+                group_by:
+                  func: avg
+                  duration: 5min
+              - entity: sensor.grid_consumption
+                name: Import
+                yaxis_id: kw
+                type: area
+                color: '#EF4444'
+                opacity: 0.2
+                stroke_width: 1
+                group_by:
+                  func: avg
+                  duration: 5min
+              - entity: sensor.feed_in
+                name: Export
+                yaxis_id: kw
+                type: area
+                color: '#10B981'
+                opacity: 0.2
+                stroke_width: 1
+                transform: return -x;
+                group_by:
+                  func: avg
+                  duration: 5min
+              - entity: sensor.solcast_pv_forecast_forecast_today
+                name: Forecast
+                yaxis_id: kw
+                type: line
+                color: '#FCD34D'
+                stroke_width: 2
+                stroke_dash: 5
+                unit: kW
+                show:
+                  in_header: false
+                  legend_value: false
+                data_generator: return (entity.attributes.detailedForecast || []).map(e => [new Date(e.period_start).getTime(),
+                  e.pv_estimate]);
+              - entity: sensor.battery_soc
+                name: SoC
+                yaxis_id: soc
+                type: line
+                color: '#14B8A6'
+                stroke_width: 2
+                curve: smooth
+                unit: '%'
+                group_by:
+                  func: last
+                  duration: 5min
+      - type: grid
+        cards:
+          - type: heading
+            heading: Battery
+            heading_style: title
+            icon: mdi:home-battery
+          - type: gauge
+            entity: sensor.battery_soc
+            name: State of charge
+            min: 0
+            max: 100
+            needle: true
+            grid_options: *id001
+            segments:
+              - from: 0
+                color: '#EF4444'
+              - from: 20
+                color: '#F59E0B'
+              - from: 50
+                color: '#10B981'
+          - type: tile
+            entity: sensor.bms_kwh_remaining
+            name: Stored
+            color: '#14B8A6'
+          - type: tile
+            entity: select.work_mode
+            name: Mode
+            color: '#9CA3AF'
+          - type: custom:apexcharts-card
+            grid_options: *id001
+            graph_span: 24h
+            span:
+              start: day
+            header:
+              show: true
+              title: Battery flow today
+              show_states: false
+            apex_config:
+              chart:
+                height: 200
+              legend:
+                show: false
+            series:
+              - entity: sensor.battery_discharge
+                name: Discharge
+                type: area
+                color: '#14B8A6'
+                opacity: 0.4
+                stroke_width: 1
+                group_by:
+                  func: avg
+                  duration: 5min
+              - entity: sensor.battery_charge
+                name: Charge
+                type: area
+                color: '#8B5CF6'
+                opacity: 0.4
+                stroke_width: 1
+                transform: return -x;
+                group_by:
+                  func: avg
+                  duration: 5min
+          - type: heading
+            heading: Today
+            heading_style: title
+            icon: mdi:calendar-today
+          - type: tile
+            entity: sensor.solar_energy_today
+            name: Solar
+            color: amber
+          - type: tile
+            entity: sensor.load_energy_today
+            name: House
+            color: blue
+          - type: tile
+            entity: sensor.grid_consumption_energy_today
+            name: Imported
+            color: red
+          - type: tile
+            entity: sensor.feed_in_energy_today
+            name: Exported
+            color: green
+          - type: tile
+            entity: sensor.battery_charge_today
+            name: Batt in
+            color: purple
+          - type: tile
+            entity: sensor.battery_discharge_today
+            name: Batt out
+            color: teal
+      - type: grid
+        cards:
+          - type: heading
+            heading: Solar forecast (Solcast)
+            heading_style: title
+            icon: mdi:weather-partly-cloudy
+          - type: tile
+            entity: sensor.solcast_pv_forecast_forecast_today
+            name: Today
+            color: amber
+          - type: tile
+            entity: sensor.solcast_pv_forecast_forecast_remaining_today
+            name: Remaining
+            color: orange
+          - type: tile
+            entity: sensor.solcast_pv_forecast_forecast_tomorrow
+            name: Tomorrow
+            color: yellow
+          - type: tile
+            entity: sensor.solcast_pv_forecast_peak_forecast_today
+            name: Peak today
+            color: amber
+          - type: tile
+            entity: sensor.solcast_pv_forecast_peak_forecast_tomorrow
+            name: Peak tomorrow
+            color: yellow
+          - type: tile
+            entity: sensor.solcast_pv_forecast_power_now
+            name: Forecast now
+            color: orange
+      - type: grid
+        cards:
+          - type: heading
+            heading: Today vs forecast
+            heading_style: title
+            icon: mdi:chart-areaspline
+          - type: custom:apexcharts-card
+            grid_options: *id001
+            graph_span: 24h
+            span:
+              start: day
+            header:
+              show: true
+              title: Actual and forecast
+            apex_config:
+              chart:
+                height: 240
+              legend:
+                show: false
+              tooltip:
+                x:
+                  format: HH:mm
+            yaxis:
+              - min: 0
+                decimals: 1
+            series:
+              - entity: sensor.foxess_modbus_pv_power
+                name: Actual
+                type: area
+                color: '#F59E0B'
+                opacity: 0.4
+                stroke_width: 2
+                group_by:
+                  func: avg
+                  duration: 30min
+              - entity: sensor.solcast_pv_forecast_forecast_today
+                name: Forecast
+                type: line
+                color: '#3B82F6'
+                stroke_width: 2
+                stroke_dash: 5
+                unit: kW
+                show:
+                  in_header: false
+                data_generator: return (entity.attributes.detailedForecast || []).map(e => [new Date(e.period_start).getTime(),
+                  e.pv_estimate]);
+      - type: grid
+        cards:
+          - type: heading
+            heading: Tomorrow
+            heading_style: title
+            icon: mdi:calendar-arrow-right
+          - type: custom:apexcharts-card
+            grid_options: *id001
+            graph_span: 24h
+            span:
+              start: day
+              offset: +1d
+            header:
+              show: true
+              title: Likely, best and worst case
+            apex_config:
+              chart:
+                height: 240
+              legend:
+                show: false
+              tooltip:
+                x:
+                  format: HH:mm
+            yaxis:
+              - min: 0
+                decimals: 1
+            series:
+              - entity: sensor.solcast_pv_forecast_forecast_tomorrow
+                name: Likely
+                type: area
+                color: '#F59E0B'
+                opacity: 0.35
+                stroke_width: 2
+                unit: kW
+                show:
+                  in_header: false
+                data_generator: return (entity.attributes.detailedForecast || []).map(e => [new Date(e.period_start).getTime(),
+                  e.pv_estimate]);
+              - entity: sensor.solcast_pv_forecast_forecast_tomorrow
+                name: Best (P90)
+                type: line
+                color: '#FCD34D'
+                stroke_width: 1
+                stroke_dash: 4
+                unit: kW
+                show:
+                  in_header: false
+                data_generator: return (entity.attributes.detailedForecast || []).map(e => [new Date(e.period_start).getTime(),
+                  e.pv_estimate90]);
+              - entity: sensor.solcast_pv_forecast_forecast_tomorrow
+                name: Worst (P10)
+                type: line
+                color: '#9CA3AF'
+                stroke_width: 1
+                stroke_dash: 4
+                unit: kW
+                show:
+                  in_header: false
+                data_generator: return (entity.attributes.detailedForecast || []).map(e => [new Date(e.period_start).getTime(),
+                  e.pv_estimate10]);
+  - title: Inverter
+    path: inverter
+    icon: mdi:flash
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        column_span: 2
+        cards:
+          - type: heading
+            heading: Solar inputs
+            heading_style: title
+            icon: mdi:solar-power
+          - type: tile
+            entity: sensor.pv1_power
+            name: PV1
+            color: amber
+            grid_options:
+              columns: 3
+          - type: tile
+            entity: sensor.pv2_power
+            name: PV2
+            color: amber
+            grid_options:
+              columns: 3
+          - type: tile
+            entity: sensor.pv3_power
+            name: PV3
+            color: amber
+            grid_options:
+              columns: 3
+          - type: tile
+            entity: sensor.pv4_power
+            name: PV4
+            color: amber
+            grid_options:
+              columns: 3
+          - type: custom:apexcharts-card
+            grid_options: *id001
+            graph_span: 24h
+            span:
+              start: day
+            header:
+              show: true
+              title: MPPT inputs today
+              show_states: true
+              colorize_states: true
+            apex_config:
+              chart:
+                height: 260
+              legend:
+                show: false
+            series:
+              - entity: sensor.pv1_power
+                name: PV1
+                type: line
+                stroke_width: 2
+                color: '#F59E0B'
+                group_by:
+                  func: avg
+                  duration: 5min
+              - entity: sensor.pv2_power
+                name: PV2
+                type: line
+                stroke_width: 2
+                color: '#F97316'
+                group_by:
+                  func: avg
+                  duration: 5min
+              - entity: sensor.pv3_power
+                name: PV3
+                type: line
+                stroke_width: 2
+                color: '#3B82F6'
+                group_by:
+                  func: avg
+                  duration: 5min
+              - entity: sensor.pv4_power
+                name: PV4
+                type: line
+                stroke_width: 2
+                color: '#EF4444'
+                group_by:
+                  func: avg
+                  duration: 5min
+          - type: entities
+            grid_options: *id001
+            title: String voltage / current
+            entities:
+              - entity: sensor.pv1_voltage
+                name: PV1 voltage
+              - entity: sensor.pv1_current
+                name: PV1 current
+              - entity: sensor.pv2_voltage
+                name: PV2 voltage
+              - entity: sensor.pv2_current
+                name: PV2 current
+              - entity: sensor.pv3_voltage
+                name: PV3 voltage
+              - entity: sensor.pv3_current
+                name: PV3 current
+              - entity: sensor.pv4_voltage
+                name: PV4 voltage
+              - entity: sensor.pv4_current
+                name: PV4 current
+      - type: grid
+        cards:
+          - type: heading
+            heading: Inverter
+            heading_style: title
+            icon: mdi:sine-wave
+          - type: tile
+            entity: sensor.inverter_state
+            name: State
+            color: green
+          - type: tile
+            entity: sensor.inverter_fault_code
+            name: Fault
+            color: red
+          - type: tile
+            entity: sensor.rpower
+            name: Output
+            color: amber
+          - type: tile
+            entity: sensor.grid_ct
+            name: Grid CT
+            color: blue
+          - type: tile
+            entity: sensor.invtemp
+            name: Inverter temp
+            color: orange
+          - type: tile
+            entity: sensor.ambtemp
+            name: Ambient
+            color: grey
+          - type: heading
+            heading: Battery health
+            heading_style: title
+            icon: mdi:battery-heart-variant
+          - type: tile
+            entity: sensor.battery_soh
+            name: Health
+            color: green
+          - type: tile
+            entity: sensor.invbatvolt
+            name: Voltage
+            color: teal
+          - type: tile
+            entity: sensor.bms_cell_temp_high
+            name: Cell temp hi
+            color: orange
+          - type: tile
+            entity: sensor.bms_cell_temp_low
+            name: Cell temp lo
+            color: blue
+          - type: custom:apexcharts-card
+            grid_options: *id001
+            graph_span: 48h
+            header:
+              show: true
+              title: Cell voltage spread (48 h)
+              show_states: true
+            apex_config:
+              chart:
+                height: 200
+              legend:
+                show: false
+            series:
+              - entity: sensor.bms_cell_mv_high
+                name: High
+                color: '#EF4444'
+                stroke_width: 2
+                group_by:
+                  func: max
+                  duration: 15min
+              - entity: sensor.bms_cell_mv_low
+                name: Low
+                color: '#3B82F6'
+                stroke_width: 2
+                group_by:
+                  func: min
+                  duration: 15min
+      - type: grid
+        cards:
+          - type: heading
+            heading: Controls
+            heading_style: title
+            icon: mdi:tune-variant
+          - type: tile
+            entity: select.work_mode
+            name: Work mode
+            color: primary
+            grid_options:
+              columns: full
+            features:
+              - type: select-options
+          - type: entities
+            grid_options: *id001
+            entities:
+              - entity: number.min_soc
+                name: Min SoC
+              - entity: number.min_soc_on_grid
+                name: Min SoC (on grid)
+              - entity: number.max_soc
+                name: Max SoC
+              - type: divider
+              - entity: number.max_charge_current
+                name: Max charge current
+              - entity: number.max_discharge_current
+                name: Max discharge current
+              - entity: number.force_charge_power
+                name: Force charge power
+              - entity: number.force_discharge_power
+                name: Force discharge power
+              - type: divider
+              - entity: number.export_power_limit
+                name: Export limit
+              - entity: number.import_power_limit
+                name: Import limit
+  - title: Panels
+    path: panels
+    icon: mdi:solar-panel
+    type: panel
+    cards:
+      - type: custom:tigo-array-card
+        title: Roof
+        peak: 460
+        metric: power
+        view_box: 10 95 950 570
+        string_colours:
+          South: '#22c55e'
+          West: '#3b82f6'
+          East: '#ef4444'
+        outline:
+          - M20 115 H950 V655 H20 Z
+          - M78 475 H950
+          - M252 115 V475
+          - M717 115 V475
+          - M20 335 L252 475 L377 400
+          - M950 335 L717 475 L595 400
+          - M377 115 V400 H595 V115
+          - M20 418 H78 V528 H20
+          - M888 475 V403 H950
+          - M157 655 V612 L205 578 L252 612 V655 M205 578 V655
+          - M413 655 V612 L461 578 L510 612 V655 M461 578 V655
+          - M718 655 V612 L766 578 L815 612 V655 M766 578 V655
+        panels:
+          - id: west_1
+            string: West
+            at:
+              - 43
+              - 137
+              - 93
+              - 62
+          - id: west_2
+            string: West
+            at:
+              - 139
+              - 137
+              - 93
+              - 62
+          - id: west_3
+            string: West
+            at:
+              - 43
+              - 204
+              - 93
+              - 62
+          - id: west_4
+            string: West
+            at:
+              - 139
+              - 204
+              - 93
+              - 62
+          - id: west_5
+            string: West
+            at:
+              - 139
+              - 271
+              - 93
+              - 62
+          - id: east_middle_01
+            string: East
+            at:
+              - 267
+              - 137
+              - 93
+              - 62
+          - id: east_middle_02
+            string: East
+            at:
+              - 267
+              - 204
+              - 93
+              - 62
+          - id: east_middle_03
+            string: East
+            at:
+              - 267
+              - 271
+              - 93
+              - 62
+          - id: west_middle_01
+            string: West
+            at:
+              - 609
+              - 137
+              - 93
+              - 62
+          - id: west_middle_02
+            string: West
+            at:
+              - 609
+              - 204
+              - 93
+              - 62
+          - id: west_middle_03
+            string: West
+            at:
+              - 609
+              - 271
+              - 93
+              - 62
+          - id: east_1
+            string: East
+            at:
+              - 734
+              - 137
+              - 93
+              - 62
+          - id: east_2
+            string: East
+            at:
+              - 829
+              - 137
+              - 93
+              - 62
+          - id: east_3
+            string: East
+            at:
+              - 734
+              - 204
+              - 93
+              - 62
+          - id: east_4
+            string: East
+            at:
+              - 829
+              - 204
+              - 93
+              - 62
+          - id: east_5
+            string: East
+            at:
+              - 734
+              - 271
+              - 93
+              - 62
+          - id: south_1
+            string: South
+            at:
+              - 118
+              - 485
+              - 63
+              - 92
+          - id: south_2
+            string: South
+            at:
+              - 186
+              - 485
+              - 63
+              - 92
+          - id: south_3
+            string: South
+            at:
+              - 254
+              - 485
+              - 63
+              - 92
+          - id: south_4
+            string: South
+            at:
+              - 322
+              - 485
+              - 63
+              - 92
+          - id: south_5
+            string: South
+            at:
+              - 390
+              - 485
+              - 63
+              - 92
+          - id: south_6
+            string: South
+            at:
+              - 458
+              - 485
+              - 63
+              - 92
+          - id: south_7
+            string: South
+            at:
+              - 526
+              - 485
+              - 63
+              - 92
+          - id: south_8
+            string: South
+            at:
+              - 594
+              - 485
+              - 63
+              - 92
+          - id: south_9
+            string: South
+            at:
+              - 662
+              - 485
+              - 63
+              - 92
+          - id: south_10
+            string: South
+            at:
+              - 730
+              - 485
+              - 63
+              - 92
+          - id: south_11
+            string: South
+            at:
+              - 798
+              - 485
+              - 63
+              - 92
+  - title: Diagnostics
+    path: diagnostics
+    icon: mdi:stethoscope
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Health
+            heading_style: title
+            icon: mdi:alert-circle-outline
+          - type: custom:auto-entities
+            grid_options: *id001
+            card:
+              type: entities
+              title: Panels with no data
+            filter:
+              include:
+                - entity_id: sensor.tigo_ts4_*_power
+                  state: unavailable
+            show_empty: false
+          - type: tile
+            entity: sensor.connection_status
+            name: Fox Modbus link
+            color: green
+            grid_options:
+              columns: full
+          - type: custom:auto-entities
+            grid_options: *id001
+            card:
+              type: entities
+              title: Performance – lowest first
+            filter:
+              include:
+                - entity_id: sensor.tigo_ts4_*_performance
+              exclude:
+                - state: unavailable
+            sort:
+              method: state
+              numeric: true
+              reverse: false
+      - type: grid
+        cards:
+          - type: heading
+            heading: Panel temperature
+            heading_style: title
+            icon: mdi:thermometer
+          - type: custom:auto-entities
+            grid_options: *id001
+            card:
+              type: entities
+              title: Hottest first
+            filter:
+              include:
+                - entity_id: sensor.tigo_ts4_*_temperature
+              exclude:
+                - state: unavailable
+            sort:
+              method: state
+              numeric: true
+              reverse: true
+      - type: grid
+        cards:
+          - type: heading
+            heading: Comms
+            heading_style: title
+            icon: mdi:access-point
+          - type: custom:auto-entities
+            grid_options: *id001
+            card:
+              type: entities
+              title: RSSI
+            filter:
+              include:
+                - entity_id: sensor.tigo_ts4_*_rssi
+              exclude:
+                - state: unavailable
+            sort:
+              method: state
+              numeric: true
+              reverse: false
+          - type: custom:auto-entities
+            grid_options: *id001
+            card:
+              type: entities
+              title: Readings today
+            filter:
+              include:
+                - entity_id: sensor.tigo_ts4_*_readings_today
+              exclude:
+                - state: unavailable
+            sort:
+              method: state
+              numeric: true
+              reverse: false
+          - type: entities
+            grid_options: *id001
+            title: Firmware
+            entities:
+              - entity: sensor.master_version
+                name: Master
+              - entity: sensor.slave_version
+                name: Slave
+              - entity: sensor.manager_version
+                name: Manager

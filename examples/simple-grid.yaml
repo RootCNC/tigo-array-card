@@ -1,0 +1,22 @@
+# Grid mode – the quickest way to start. No coordinates needed: list each string's panels row by row,
+# roughly as they sit on the roof. Use null for a gap (vent, chimney, skylight).
+#
+# Panel ids are the middle part of the PyTap entity ids:
+#   sensor.tigo_ts4_south_1_power  ->  south_1
+type: custom:tigo-array-card
+title: Panels
+peak: 460            # panel rating in W – scales the Power colours
+aspect: 0.6          # panel width / height: 0.6 = portrait, 1.65 = landscape
+grid_options:
+  columns: full
+strings:
+  - name: South      # header total comes from sensor.tigo_string_south_power
+    rows:
+      - [south_1, south_2, south_3, south_4, south_5, south_6]
+      - [south_7, south_8, null, south_9, south_10, south_11]
+  - name: East
+    rows:
+      - [east_1, east_2, east_3, east_4]
+  - name: West
+    rows:
+      - [west_1, west_2, west_3, west_4]
