@@ -14,6 +14,7 @@
 - The Finish/Cancel line bar only shows while a line is being drawn. Switching tool keeps a line in progress
   instead of discarding it, and Enter no longer also re-triggers whichever sidebar button was last clicked.
 - Hold **Ctrl** or **Shift** to draw roof lines exactly horizontal or vertical, or to move a panel in a straight line.
+- Roof-line clicks snap onto existing corners, and clicking the first corner closes the shape.
 - The canvas scales to fit the window, and new panel ids carry on from the highest existing number after an import.
 
 ## 1.0.0 – first public release

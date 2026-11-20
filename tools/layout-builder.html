@@ -71,7 +71,7 @@
     <button id="tSel" title="Click a panel to edit, drag to move">⬚ Select</button>
   </div>
   <div id="lineBar" class="row"><span id="lineInfo">Drawing a line</span><button id="finLine">✓ Finish</button><button id="canLine">✕ Cancel</button></div>
-  <p class="hint">Panel: drag a rectangle. Roof line: click each corner, then double-click, <kbd>Enter</kbd> or <b>Finish line</b>; <kbd>Esc</kbd> cancels. Hold <kbd>Ctrl</kbd> or <kbd>Shift</kbd> for straight horizontal/vertical lines (also when dragging a panel). Select: click a panel or roof line to edit it; drag to move it; <kbd>Del</kbd> removes it.</p>
+  <p class="hint">Panel: drag a rectangle. Roof line: click each corner, then double-click, <kbd>Enter</kbd> or <b>✓ Finish</b>; <kbd>Esc</kbd> cancels. Hold <kbd>Ctrl</kbd> or <kbd>Shift</kbd> for straight horizontal/vertical lines (also when dragging). Clicks near an existing corner snap onto it; clicking your first corner closes the shape. Select: click a panel or roof line to edit it; drag to move it; <kbd>Del</kbd> removes it.</p>
   <label>Next panel: string &amp; id pattern (<code>{n}</code> = number)</label>
   <div class="row">
     <select id="curStr"></select>
@@ -358,6 +358,12 @@ function hitLine(x, y, tol) {
   }
   return null;
 }
+function nearestCorner(x, y, tol) {
+  let best = null, bd = tol;
+  const all = S.lines.flat().concat(S.draft && S.draft.type === "line" ? S.draft.pts.slice(1) : []);
+  all.forEach((c) => { const d = Math.hypot(c[0] - x, c[1] - y); if (d <= bd) { bd = d; best = [...c]; } });
+  return best;
+}
 function hitPanel(x, y) {
   for (let i = S.panels.length - 1; i >= 0; i--) {
     const p = S.panels[i];
@@ -406,8 +412,14 @@ stage.addEventListener("pointerdown", (ev) => {
   } else if (S.tool === "line") {
     if (S.draft && isDoubleTap(x, y)) { finishLine(); return; }
     if (!S.draft) { isDoubleTap(x, y); S.draft = { type: "line", pts: [] }; }
-    const prev = S.draft.pts[S.draft.pts.length - 1];
-    S.draft.pts.push(locked(ev) ? ortho(prev, x, y) : [x, y]); renderDraft();
+    const pts = S.draft.pts, prev = pts[pts.length - 1], snapTol = tolOf(10);
+    // clicking on the first corner (3+ points) closes the shape and finishes the line
+    if (pts.length >= 3 && Math.hypot(x - pts[0][0], y - pts[0][1]) <= snapTol) {
+      pts.push([...pts[0]]); lastTap = null; finishLine(); return;
+    }
+    // snap onto an existing corner so lines join up exactly; otherwise Ctrl/Shift straightens
+    const near = nearestCorner(x, y, snapTol);
+    pts.push(near ? near : locked(ev) ? ortho(prev, x, y) : [x, y]); renderDraft();
   } else {
     const tol = tolOf(9), ln = S.lines[S.selLine];
     // 1. a corner handle of the selected line

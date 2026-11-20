@@ -30,7 +30,7 @@ It reads the sensors created by the **[PyTap](https://github.com/azebro/pytap)**
 - **Day view**: step back day by day to compare each panel's peak power, daily energy or average.
 - **IDs view**: shows every optimiser's barcode in its position, for checking that the layout matches the roof.
 - **Dead-panel highlighting**: an optimiser with no data is drawn hatched with a red outline.
-- **Layout builder**: draw your panels over a photo or plan of your roof in the browser, and copy the YAML out.
+- **[Layout builder](https://rootcnc.github.io/tigo-array-card/tools/layout-builder.html)**: draw your panels over a photo or plan of your roof in the browser, and copy the YAML out.
 - Follows your Home Assistant theme (light or dark) and works in Sections, Masonry and Panel views.
 
 | Day view (light theme) | Grid mode |
@@ -110,22 +110,23 @@ Drawing mode places every panel at exact coordinates over an outline of your roo
 
 ### The easy way: the layout builder
 
+**[Open the layout builder](https://rootcnc.github.io/tigo-array-card/tools/layout-builder.html)**. It runs in your browser, and your roof image never leaves your computer.
+
 ![Layout builder](images/layout-builder.png)
 
-1. Download **[tools/layout-builder.html](tools/layout-builder.html)** and open it in any desktop browser. It runs entirely offline and nothing is uploaded.
-2. **Background:** load a roof plan, an installer's layout drawing or an aerial screenshot. The canvas takes the image's size.
-3. **Strings:** name them **exactly as in PyTap** (e.g. `South`, `East`, `West`) and pick colours.
-4. **Panel tool:** choose the string and the id pattern (e.g. `south_{n}`), then drag a rectangle over the first panel. Its id is filled in automatically and the number counts up.
-5. **Repeat:** with a panel selected, use *Repeat* to add a whole row or column at the same size and spacing in one go.
-6. **Roof line tool** (optional): click each corner along ridges, hips and edges. Finish each line by double-clicking, pressing Enter or clicking **Finish line**. Hold **Ctrl** or **Shift** while clicking to keep a segment exactly horizontal or vertical.
-7. **Select tool:**
-   - **Panels:** click one to fix its id or string, or drag it to nudge it.
-   - **Roof lines:** click one to select it, then drag the line to move it all, or drag a corner point (shown as a dot) to move just that corner. Double-click on a selected line to add a point.
-   - Hold **Ctrl** or **Shift** while dragging to keep things straight.
-   - **Delete** removes the selected point, line or panel, and **Ctrl+Z** undoes.
-8. **Copy YAML** and paste it into a Manual card.
+1. **Background:** load a picture of your roof: an installer's layout drawing, an aerial screenshot, or a sketch.
+2. **Strings:** rename them to match PyTap **exactly** (e.g. `South`, `East`, `West`) and pick colours.
+3. **Panels:** with the **Panel** tool, pick the string, then drag a rectangle over each panel. Ids such as `south_1`, `south_2`… are filled in automatically. For rows of identical panels, draw one and use **Repeat**.
+4. **Roof lines** (optional): with the **Roof line** tool, click each corner, then double-click (or press Enter) to finish. Hold **Ctrl/Shift** for straight horizontal or vertical lines.
+5. **Tidy up:** with the **Select** tool, click a panel or line to edit it.
+   - Drag a panel or line to move it, or drag a line's corner dots to reshape it.
+   - Double-click a selected line to add a corner.
+   - **Delete** removes the selection, and **Ctrl+Z** undoes.
+6. **Copy YAML** and paste it into a **Manual** card in Home Assistant.
 
-To change a layout later, open the builder and paste your card's YAML into *Edit an existing layout*. It accepts the YAML exactly as Home Assistant's card editor shows it, a whole dashboard's raw configuration (it finds the card inside), and grid-mode cards (their rows are laid out as a starting point).
+To change a layout later, paste your card's YAML into **Edit an existing layout** and click **Load layout**.
+
+**Full guide, with keyboard shortcuts and tips: [docs/layout-builder.md](docs/layout-builder.md)**
 
 ### By hand
 
@@ -219,6 +220,7 @@ Every option with a comment: [examples/all-options.yaml](examples/all-options.ya
 
 ## More guides
 
+- **[docs/layout-builder.md](docs/layout-builder.md)**: step-by-step guide to drawing your roof with the layout builder.
 - **[docs/tigo-pytap-setup.md](docs/tigo-pytap-setup.md)**: Waveshare adapter settings, wiring to the CCA, installing and configuring PyTap, reading its diagnostics, adding a second TAP.
 - **[docs/foxess-modbus.md](docs/foxess-modbus.md)**: local control of a FoxESS hybrid inverter over RS485 with a second Waveshare adapter, plus the Energy dashboard setup.
 - **[docs/dashboard-and-energy-tracking.md](docs/dashboard-and-energy-tracking.md)**: a complete four-tab solar dashboard, Solcast forecast-vs-actual tracking, savings sensors and alerts.

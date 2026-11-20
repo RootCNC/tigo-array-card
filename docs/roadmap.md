@@ -16,7 +16,6 @@ Contributions are welcome. Open an issue first for anything large.
 
 - Snap-to-neighbour alignment guides, multi-select and move.
 - Import directly from a Tigo installer layout export, if a format can be identified.
-- Host it on GitHub Pages so nobody needs to download the file (enable Pages for the repository and link `tools/layout-builder.html`).
 
 ## Integrations
 
