@@ -117,11 +117,11 @@ Drawing mode places every panel at exact coordinates over an outline of your roo
 3. **Strings:** name them **exactly as in PyTap** (e.g. `South`, `East`, `West`) and pick colours.
 4. **Panel tool:** choose the string and the id pattern (e.g. `south_{n}`), then drag a rectangle over the first panel. Its id is filled in automatically and the number counts up.
 5. **Repeat:** with a panel selected, use *Repeat* to add a whole row or column at the same size and spacing in one go.
-6. **Roof line tool** (optional): click along ridges, hips and edges, and press Enter (or double-click) to finish each line.
+6. **Roof line tool** (optional): click each corner along ridges, hips and edges. Finish each line by double-clicking, pressing Enter or clicking **Finish line**.
 7. **Select tool:** click a panel to fix its id or string, drag it to nudge it, or press Delete to remove it.
 8. **Copy YAML** and paste it into a Manual card.
 
-To change a layout later, open the builder and paste your card's YAML into *Edit an existing layout*.
+To change a layout later, open the builder and paste your card's YAML into *Edit an existing layout*. It accepts the YAML exactly as Home Assistant's card editor shows it, a whole dashboard's raw configuration (it finds the card inside), and grid-mode cards (their rows are laid out as a starting point).
 
 ### By hand
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## Layout builder update – 2026-11-20
+
+- Import now uses a full YAML parser. It reads YAML re-saved by Home Assistant's card editor (block style, quotes,
+  Windows line endings), a whole dashboard's raw configuration, grid-mode cards and older `x:/y:/w:/h:` layouts,
+  and gives a clear message if the YAML can't be read.
+- Double-click reliably finishes a roof line, including over a background image. Also new: **Finish line** and **Cancel line** buttons.
+- Drawing panels no longer stutters or fails with large photos: the image isn't redrawn while you drag, and the
+  browser can't start dragging the image itself.
+- The canvas scales to fit the window, and new panel ids carry on from the highest existing number after an import.
+
 ## 1.0.0 – first public release
 
 - Two layouts: **grid mode** (rows per string, no coordinates) and **drawing mode** (exact roof plan with SVG outline).
