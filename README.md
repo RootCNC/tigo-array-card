@@ -118,7 +118,11 @@ Drawing mode places every panel at exact coordinates over an outline of your roo
 4. **Panel tool:** choose the string and the id pattern (e.g. `south_{n}`), then drag a rectangle over the first panel. Its id is filled in automatically and the number counts up.
 5. **Repeat:** with a panel selected, use *Repeat* to add a whole row or column at the same size and spacing in one go.
 6. **Roof line tool** (optional): click each corner along ridges, hips and edges. Finish each line by double-clicking, pressing Enter or clicking **Finish line**. Hold **Ctrl** or **Shift** while clicking to keep a segment exactly horizontal or vertical.
-7. **Select tool:** click a panel to fix its id or string, drag it to nudge it (hold Ctrl or Shift to move it in a straight line), or press Delete to remove it.
+7. **Select tool:**
+   - **Panels:** click one to fix its id or string, or drag it to nudge it.
+   - **Roof lines:** click one to select it, then drag the line to move it all, or drag a corner point (shown as a dot) to move just that corner. Double-click on a selected line to add a point.
+   - Hold **Ctrl** or **Shift** while dragging to keep things straight.
+   - **Delete** removes the selected point, line or panel, and **Ctrl+Z** undoes.
 8. **Copy YAML** and paste it into a Manual card.
 
 To change a layout later, open the builder and paste your card's YAML into *Edit an existing layout*. It accepts the YAML exactly as Home Assistant's card editor shows it, a whole dashboard's raw configuration (it finds the card inside), and grid-mode cards (their rows are laid out as a starting point).

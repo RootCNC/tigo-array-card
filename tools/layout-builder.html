@@ -30,6 +30,10 @@
   .pl text { font:600 14px system-ui; fill:#fff; paint-order:stroke; stroke:#000; stroke-width:3px; pointer-events:none; text-anchor:middle; dominant-baseline:middle; }
   .ol { fill:none; stroke:#e5e7eb; stroke-width:3; opacity:.8; }
   .ol.draft { stroke:var(--accent); stroke-dasharray:5 4; }
+  .ol.selline { stroke:var(--accent); opacity:1; }
+  #lineBar { display:none; margin-top:6px; padding:6px; border:1px dashed var(--accent); border-radius:6px; }
+  #lineBar.show { display:flex; }
+  #lineBar span { flex:1; font-size:12px; color:var(--accent); align-self:center; }
   .str { display:flex; gap:6px; align-items:center; margin:3px 0; }
   .str input[type=text] { flex:1; min-width:0; }
   #sel { border:1px solid var(--line); border-radius:6px; padding:8px; margin-top:6px; }
@@ -66,8 +70,8 @@
     <button id="tLine" title="Click points, double-click or Enter to finish">╱ Roof line</button>
     <button id="tSel" title="Click a panel to edit, drag to move">⬚ Select</button>
   </div>
-  <div class="row" style="margin-top:6px"><button id="finLine" style="flex:1">✓ Finish line</button><button id="canLine" style="flex:1">✕ Cancel line</button></div>
-  <p class="hint">Panel: drag a rectangle. Roof line: click each corner, then double-click, <kbd>Enter</kbd> or <b>Finish line</b>; <kbd>Esc</kbd> cancels. Hold <kbd>Ctrl</kbd> or <kbd>Shift</kbd> for straight horizontal/vertical lines (also when dragging a panel). Select: click a panel to edit, drag to move, <kbd>Del</kbd> removes it.</p>
+  <div id="lineBar" class="row"><span id="lineInfo">Drawing a line</span><button id="finLine">✓ Finish</button><button id="canLine">✕ Cancel</button></div>
+  <p class="hint">Panel: drag a rectangle. Roof line: click each corner, then double-click, <kbd>Enter</kbd> or <b>Finish line</b>; <kbd>Esc</kbd> cancels. Hold <kbd>Ctrl</kbd> or <kbd>Shift</kbd> for straight horizontal/vertical lines (also when dragging a panel). Select: click a panel or roof line to edit it; drag to move it; <kbd>Del</kbd> removes it.</p>
   <label>Next panel: string &amp; id pattern (<code>{n}</code> = number)</label>
   <div class="row">
     <select id="curStr"></select>
@@ -105,7 +109,7 @@
 const S = {
   w: 1000, h: 700, img: null, showImg: true,
   strings: [ { name: "South", colour: "#22c55e" }, { name: "West", colour: "#3b82f6" }, { name: "East", colour: "#ef4444" } ],
-  panels: [], lines: [], tool: "panel", sel: -1, draft: null, history: [],
+  panels: [], lines: [], tool: "panel", sel: -1, selLine: -1, selVertex: -1, draft: null, history: [],
   title: "Roof", peak: 400, snap: 1, cur: "South", pattern: "south_{n}", nextN: 1,
 };
 const $ = (id) => document.getElementById(id);
@@ -168,6 +172,9 @@ function renderBg() {
 }
 function renderDraft() {
   L.draft.innerHTML = "";
+  const drawing = !!(S.draft && S.draft.type === "line");
+  $("lineBar").classList.toggle("show", drawing);
+  if (drawing) $("lineInfo").textContent = `Drawing a line: ${S.draft.pts.length} point${S.draft.pts.length === 1 ? "" : "s"}`;
   if (S.draft && S.draft.type === "line" && S.draft.pts.length) {
     L.draft.appendChild(path(S.draft.cursor ? [...S.draft.pts, S.draft.cursor] : S.draft.pts, "ol draft"));
     S.draft.pts.forEach(([x, y]) => {
@@ -191,7 +198,18 @@ function render() {
   st.classList.toggle("selmode", S.tool === "select");
   renderBg();
   L.lines.innerHTML = "";
-  S.lines.forEach((pts) => L.lines.appendChild(path(pts, "ol")));
+  const hr = Math.max(4, S.w / 160);
+  S.lines.forEach((pts, i) => {
+    L.lines.appendChild(path(pts, i === S.selLine ? "ol selline" : "ol"));
+    if (i !== S.selLine) return;
+    pts.forEach(([x, y], v) => {
+      if (isClosed(pts) && v === pts.length - 1) return;           // closed shape: last point = first point
+      const c = document.createElementNS(svgNS, "circle");
+      c.setAttribute("cx", x); c.setAttribute("cy", y); c.setAttribute("r", v === S.selVertex ? hr * 1.4 : hr);
+      c.setAttribute("fill", v === S.selVertex ? "#f59e0b" : "#111827"); c.setAttribute("stroke", "#f59e0b"); c.setAttribute("stroke-width", hr / 2);
+      L.lines.appendChild(c);
+    });
+  });
   L.panels.innerHTML = "";
   S.panels.forEach((p, i) => {
     const g = document.createElementNS(svgNS, "g"); g.setAttribute("class", "pl");
@@ -233,8 +251,28 @@ function renderStrings() {
   if (!S.strings.some((s) => s.name === S.cur)) S.cur = S.strings[0].name;
 }
 function renderSel() {
-  const box = $("sel"), p = S.panels[S.sel];
-  if (!p) { box.className = "muted"; box.textContent = "No panel selected."; return; }
+  const box = $("sel"), p = S.panels[S.sel], ln = S.lines[S.selLine];
+  if (ln) {
+    const n = isClosed(ln) ? ln.length - 1 : ln.length;
+    const v = S.selVertex >= 0 ? ln[S.selVertex] : null;
+    box.className = "";
+    box.innerHTML = `
+      <div class="row"><b>Selected roof line</b><span class="muted">${n} points${isClosed(ln) ? ", closed" : ""}</span></div>
+      <p class="hint">Drag the line to move it, or drag a point to move just that corner. Hold <kbd>Ctrl</kbd>/<kbd>Shift</kbd> to keep it straight.
+        Double-click on the line to add a point.</p>
+      ${v ? `<label>Selected point x, y</label><div class="row"><input type="number" id="vx" value="${v[0]}"><input type="number" id="vy" value="${v[1]}">
+        <button id="vDel" ${n > (isClosed(ln) ? 3 : 2) ? "" : "disabled"}>Delete point</button></div>` : ""}
+      <div class="row" style="margin-top:8px"><button id="lDel">Delete line</button></div>`;
+    $("lDel").onclick = deleteSelected.bind(null, "line");
+    if (v) {
+      const upd = () => { snapshot(); const x = Number($("vx").value), y = Number($("vy").value);
+        if (Number.isFinite(x) && Number.isFinite(y)) setVertex(ln, S.selVertex, [x, y]); render(); };
+      $("vx").onchange = upd; $("vy").onchange = upd;
+      $("vDel").onclick = deleteSelected.bind(null, "point");
+    }
+    return;
+  }
+  if (!p) { box.className = "muted"; box.textContent = S.tool === "select" ? "Click a panel or roof line to edit it." : "Nothing selected."; return; }
   box.className = "";
   box.innerHTML = `
     <div class="row"><b>Selected panel</b></div>
@@ -246,11 +284,11 @@ function renderSel() {
     <div class="row"><input type="number" id="rn" value="3" min="1" title="copies"> copies,
       gap <input type="number" id="rg" value="4" title="gap"> <select id="rd"><option value="r">→ right</option><option value="d">↓ down</option><option value="l">← left</option><option value="u">↑ up</option></select>
       <button id="rgo">Repeat</button></div>
-    <div class="row" style="margin-top:8px"><button id="sDel">Delete</button></div>`;
+    <div class="row" style="margin-top:8px"><button id="sDel">Delete panel</button></div>`;
   const upd = () => { snapshot(); p.id = $("sId").value.trim() || p.id; p.string = $("sStr").value;
     ["x", "y", "w", "h"].forEach((k) => { const v = Number($("s" + k).value); if (Number.isFinite(v)) p[k] = v; }); render(); };
   ["sId", "sStr", "sx", "sy", "sw", "sh"].forEach((id) => ($(id).onchange = upd));
-  $("sDel").onclick = () => { snapshot(); S.panels.splice(S.sel, 1); S.sel = -1; render(); };
+  $("sDel").onclick = deleteSelected.bind(null, "panel");
   $("rgo").onclick = () => repeat(S.sel, Number($("rn").value), Number($("rg").value), $("rd").value);
 }
 
@@ -262,7 +300,7 @@ function nextId() {
 function addPanel(x, y, w, h) {
   snapshot();
   S.panels.push({ id: nextId(), string: S.cur, x: round(x), y: round(y), w: round(w), h: round(h) });
-  S.sel = S.panels.length - 1; render();
+  S.sel = S.panels.length - 1; S.selLine = -1; S.selVertex = -1; render();
 }
 function repeat(i, n, gap, dir) {
   const p = S.panels[i]; if (!p || !(n > 0)) return;
@@ -278,16 +316,47 @@ function finishLine() {
   if (S.draft && S.draft.type === "line" && S.draft.pts.length > 1) { snapshot(); S.lines.push(S.draft.pts); }
   S.draft = null; render();
 }
+function clearSel() { S.sel = -1; S.selLine = -1; S.selVertex = -1; }
 function setTool(t) {
+  if (S.draft && S.draft.type === "line") finishLine();   // switching tool keeps the line you were drawing
   S.tool = t; S.draft = null;
+  if (t !== "select") { S.selLine = -1; S.selVertex = -1; }
   [["tPanel", "panel"], ["tLine", "line"], ["tSel", "select"]].forEach(([id, v]) => $(id).classList.toggle("on", v === t));
   render();
 }
+function deleteSelected(what) {
+  const ln = S.lines[S.selLine];
+  if ((what === "point" || (!what && S.selVertex >= 0)) && ln && S.selVertex >= 0) {
+    const closed = isClosed(ln), n = closed ? ln.length - 1 : ln.length;
+    if (n <= (closed ? 3 : 2)) return;                    // keep at least a segment / a triangle
+    snapshot();
+    if (closed && S.selVertex === 0) { ln.shift(); ln[ln.length - 1] = [...ln[0]]; }
+    else ln.splice(S.selVertex, 1);
+    S.selVertex = -1; render(); return;
+  }
+  if ((what === "line" || !what) && ln) { snapshot(); S.lines.splice(S.selLine, 1); clearSel(); render(); return; }
+  if ((what === "panel" || !what) && S.sel >= 0) { snapshot(); S.panels.splice(S.sel, 1); clearSel(); render(); }
+}
 
-// ---------- pointer ----------
-function pt(ev) {
-  const r = $("stage").getBoundingClientRect();
-  return [round(((ev.clientX - r.left) / r.width) * S.w), round(((ev.clientY - r.top) / r.height) * S.h)];
+// ---------- geometry ----------
+const isClosed = (pts) => pts.length > 2 && pts[0][0] === pts[pts.length - 1][0] && pts[0][1] === pts[pts.length - 1][1];
+function setVertex(pts, v, xy) {
+  const closed = isClosed(pts), last = pts.length - 1;   // decide before moving, or a closed shape would split
+  pts[v] = [...xy];
+  if (closed) { if (v === 0) pts[last] = [...xy]; else if (v === last) pts[0] = [...xy]; }
+}
+function segDist(px, py, a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+  let t = l2 ? ((px - a[0]) * dx + (py - a[1]) * dy) / l2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (a[0] + t * dx), py - (a[1] + t * dy));
+}
+function hitLine(x, y, tol) {
+  for (let i = S.lines.length - 1; i >= 0; i--) {
+    const pts = S.lines[i];
+    for (let k = 0; k < pts.length - 1; k++) if (segDist(x, y, pts[k], pts[k + 1]) <= tol) return { i, seg: k };
+  }
+  return null;
 }
 function hitPanel(x, y) {
   for (let i = S.panels.length - 1; i >= 0; i--) {
@@ -296,6 +365,12 @@ function hitPanel(x, y) {
   }
   return -1;
 }
+
+// ---------- pointer ----------
+function pt(ev) {
+  const r = $("stage").getBoundingClientRect();
+  return [round(((ev.clientX - r.left) / r.width) * S.w), round(((ev.clientY - r.top) / r.height) * S.h)];
+}
 let drag = null, lastTap = null;
 // Ctrl or Shift held: lock to horizontal / vertical relative to `from`
 const locked = (ev) => ev.ctrlKey || ev.shiftKey || ev.metaKey;
@@ -303,48 +378,87 @@ function ortho(from, x, y) {
   if (!from) return [x, y];
   return Math.abs(x - from[0]) >= Math.abs(y - from[1]) ? [x, from[1]] : [from[0], y];
 }
+// straighten a dragged corner against whichever neighbour needs the smaller nudge
+function orthoToNeighbours(pts, v, x, y) {
+  const closed = isClosed(pts), last = pts.length - 1, nb = [];
+  if (v > 0) nb.push(pts[v - 1]); else if (closed) nb.push(pts[last - 1]);
+  if (v < last) nb.push(pts[v + 1]); else if (closed) nb.push(pts[1]);
+  let best = [x, y], bd = Infinity;
+  nb.forEach((n) => { const c = ortho(n, x, y), d = Math.hypot(c[0] - x, c[1] - y); if (d < bd) { bd = d; best = c; } });
+  return best;
+}
 const stage = $("stage");
+const capture = (ev) => { try { stage.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ } };
+const tolOf = (px) => px * (S.w / stage.getBoundingClientRect().width);
+function isDoubleTap(x, y) {
+  const now = Date.now(), dbl = lastTap && now - lastTap.t < 450 && Math.hypot(x - lastTap.x, y - lastTap.y) < tolOf(10);
+  lastTap = dbl ? null : { t: now, x, y };
+  return dbl;
+}
 stage.addEventListener("dragstart", (ev) => ev.preventDefault());
 stage.addEventListener("pointerdown", (ev) => {
   if (ev.button !== undefined && ev.button !== 0) return;
   ev.preventDefault();
+  if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
   const [x, y] = pt(ev);
   if (S.tool === "panel") {
-    S.draft = { type: "panel", x0: x, y0: y, x1: x, y1: y };
-    try { stage.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
-    renderDraft();
+    S.draft = { type: "panel", x0: x, y0: y, x1: x, y1: y }; capture(ev); renderDraft();
   } else if (S.tool === "line") {
-    // our own double-click detection: two taps within 450 ms, close together, finish the line
-    const r = stage.getBoundingClientRect(), tol = 10 * (S.w / r.width), now = Date.now();
-    if (S.draft && lastTap && now - lastTap.t < 450 && Math.hypot(x - lastTap.x, y - lastTap.y) < tol) {
-      lastTap = null; finishLine(); return;
-    }
-    lastTap = { t: now, x, y };
-    if (!S.draft) S.draft = { type: "line", pts: [] };
+    if (S.draft && isDoubleTap(x, y)) { finishLine(); return; }
+    if (!S.draft) { isDoubleTap(x, y); S.draft = { type: "line", pts: [] }; }
     const prev = S.draft.pts[S.draft.pts.length - 1];
     S.draft.pts.push(locked(ev) ? ortho(prev, x, y) : [x, y]); renderDraft();
   } else {
-    S.sel = hitPanel(x, y);
-    if (S.sel >= 0) {
-      snapshot(); const p = S.panels[S.sel]; drag = { dx: x - p.x, dy: y - p.y, ox: p.x, oy: p.y };
-      try { stage.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+    const tol = tolOf(9), ln = S.lines[S.selLine];
+    // 1. a corner handle of the selected line
+    if (ln) {
+      const last = isClosed(ln) ? ln.length - 1 : ln.length;
+      let best = -1, bd = tol;
+      for (let v = 0; v < last; v++) { const d = Math.hypot(ln[v][0] - x, ln[v][1] - y); if (d <= bd) { bd = d; best = v; } }
+      if (best >= 0) { S.selVertex = best; drag = { kind: "vertex", moved: false }; capture(ev); render(); return; }
     }
-    render();
+    // 2. a panel (panels sit on top of roof lines)
+    const pi = hitPanel(x, y);
+    if (pi >= 0) {
+      clearSel(); S.sel = pi; const p = S.panels[pi];
+      drag = { kind: "panel", dx: x - p.x, dy: y - p.y, ox: p.x, oy: p.y, moved: false }; capture(ev); render(); return;
+    }
+    // 3. a roof line: select / move it; double-click on the selected line adds a point
+    const hl = hitLine(x, y, tol);
+    if (hl) {
+      if (hl.i === S.selLine && isDoubleTap(x, y)) {
+        snapshot(); S.lines[hl.i].splice(hl.seg + 1, 0, [x, y]); S.selVertex = hl.seg + 1; render(); return;
+      }
+      if (hl.i !== S.selLine) isDoubleTap(x, y);
+      clearSel(); S.selLine = hl.i;
+      drag = { kind: "line", sx: x, sy: y, orig: S.lines[hl.i].map((q) => [...q]), moved: false }; capture(ev); render(); return;
+    }
+    clearSel(); render();
   }
 });
 stage.addEventListener("pointermove", (ev) => {
   if (!S.draft && !drag) return;
   const [x, y] = pt(ev);
-  if (S.draft && S.draft.type === "panel") { S.draft.x1 = x; S.draft.y1 = y; renderDraft(); }
-  else if (S.draft && S.draft.type === "line") {
-    S.draft.cursor = locked(ev) ? ortho(S.draft.pts[S.draft.pts.length - 1], x, y) : [x, y]; renderDraft();
+  if (S.draft && S.draft.type === "panel") { S.draft.x1 = x; S.draft.y1 = y; renderDraft(); return; }
+  if (S.draft && S.draft.type === "line") {
+    S.draft.cursor = locked(ev) ? ortho(S.draft.pts[S.draft.pts.length - 1], x, y) : [x, y]; renderDraft(); return;
   }
-  else if (drag && S.sel >= 0) {
+  if (!drag) return;
+  if (!drag.moved) { snapshot(); drag.moved = true; }      // one undo step per drag, only if something moved
+  if (drag.kind === "panel" && S.sel >= 0) {
     const p = S.panels[S.sel];
     let nx = round(x - drag.dx), ny = round(y - drag.dy);
     if (locked(ev)) [nx, ny] = ortho([drag.ox, drag.oy], nx, ny);
-    p.x = nx; p.y = ny; render();
+    p.x = nx; p.y = ny;
+  } else if (drag.kind === "vertex" && S.selLine >= 0) {
+    const ln = S.lines[S.selLine];
+    setVertex(ln, S.selVertex, locked(ev) ? orthoToNeighbours(ln, S.selVertex, x, y) : [x, y]);
+  } else if (drag.kind === "line" && S.selLine >= 0) {
+    let dx = x - drag.sx, dy = y - drag.sy;
+    if (locked(ev)) { if (Math.abs(dx) >= Math.abs(dy)) dy = 0; else dx = 0; }
+    S.lines[S.selLine] = drag.orig.map(([px, py]) => [px + dx, py + dy]);
   }
+  render();
 });
 function endPointer() {
   if (S.draft && S.draft.type === "panel") {
@@ -365,14 +479,17 @@ function refreshCursor(ev) {
 }
 document.addEventListener("keyup", refreshCursor);
 document.addEventListener("keydown", (ev) => {
-  if (["Control", "Shift", "Meta"].includes(ev.key)) { refreshCursor(ev); return; }
-  if (ev.target && ev.target.matches && ev.target.matches("input, textarea, select")) return;
+  if (["Control", "Shift", "Meta", "Alt"].includes(ev.key)) { refreshCursor(ev); return; }
+  const t = ev.target;
+  if (t && t.matches && t.matches("input, textarea, select")) return;
+  // a focused sidebar button must not also react to Enter / Space
+  if (t && t.tagName === "BUTTON" && (ev.key === "Enter" || ev.key === " ")) ev.preventDefault();
   if (ev.key === "Enter") finishLine();
-  if (ev.key === "Escape") { S.draft = null; render(); }
-  if ((ev.key === "Delete" || ev.key === "Backspace") && S.sel >= 0) { snapshot(); S.panels.splice(S.sel, 1); S.sel = -1; render(); }
-  if ((ev.ctrlKey || ev.metaKey) && ev.key === "z") undo();
+  else if (ev.key === "Escape") { if (S.draft) { S.draft = null; renderDraft(); } else { clearSel(); render(); } }
+  else if (ev.key === "Delete" || ev.key === "Backspace") { ev.preventDefault(); deleteSelected(); }
+  else if ((ev.ctrlKey || ev.metaKey) && (ev.key === "z" || ev.key === "Z")) { ev.preventDefault(); undo(); }
 });
-function undo() { const h = S.history.pop(); if (!h) return; const o = JSON.parse(h); S.panels = o.p; S.lines = o.l; S.sel = -1; render(); }
+function undo() { const h = S.history.pop(); if (!h) return; const o = JSON.parse(h); S.panels = o.p; S.lines = o.l; clearSel(); render(); }
 
 // ---------- controls ----------
 $("img").onchange = (ev) => {
@@ -409,7 +526,7 @@ $("canLine").onclick = () => { if (S.draft && S.draft.type === "line") { S.draft
 $("tLine").onclick = () => setTool("line");
 $("tSel").onclick = () => setTool("select");
 $("undo").onclick = undo;
-$("clear").onclick = () => { if (confirm("Remove all panels and lines?")) { snapshot(); S.panels = []; S.lines = []; S.sel = -1; render(); } };
+$("clear").onclick = () => { if (confirm("Remove all panels and lines?")) { snapshot(); S.panels = []; S.lines = []; clearSel(); render(); } };
 $("copy").onclick = async () => {
   try { await navigator.clipboard.writeText($("out").value); $("copy").textContent = "Copied ✓"; }
   catch (e) { $("out").select(); document.execCommand("copy"); $("copy").textContent = "Copied ✓"; }
@@ -498,7 +615,7 @@ function importYaml(txt) {
   S.lines = outline.flatMap((d) => pathToPoints(d)).map((pts) => pts.map(([x, y]) => [x - ox, y - oy]));
   if (cfg.title) { S.title = String(cfg.title); $("title").value = S.title; }
   if (Number(cfg.peak) > 0) { S.peak = Number(cfg.peak); $("peak").value = S.peak; }
-  S.sel = -1; S.draft = null; renderStrings(); syncNext(); render();
+  clearSel(); S.draft = null; renderStrings(); syncNext(); render();
   const bits = [`Loaded ${S.panels.length} panels`, `${S.lines.length} roof lines`];
   const skipped = (cfg.panels || []).length - panels.length;
   if (Array.isArray(cfg.panels) && skipped > 0) bits.push(`${skipped} skipped (no id or position)`);
