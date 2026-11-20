@@ -67,7 +67,7 @@
     <button id="tSel" title="Click a panel to edit, drag to move">⬚ Select</button>
   </div>
   <div class="row" style="margin-top:6px"><button id="finLine" style="flex:1">✓ Finish line</button><button id="canLine" style="flex:1">✕ Cancel line</button></div>
-  <p class="hint">Panel: drag a rectangle. Roof line: click each corner, then double-click, <kbd>Enter</kbd> or <b>Finish line</b>; <kbd>Esc</kbd> cancels. Select: click a panel to edit, drag to move, <kbd>Del</kbd> removes it.</p>
+  <p class="hint">Panel: drag a rectangle. Roof line: click each corner, then double-click, <kbd>Enter</kbd> or <b>Finish line</b>; <kbd>Esc</kbd> cancels. Hold <kbd>Ctrl</kbd> or <kbd>Shift</kbd> for straight horizontal/vertical lines (also when dragging a panel). Select: click a panel to edit, drag to move, <kbd>Del</kbd> removes it.</p>
   <label>Next panel: string &amp; id pattern (<code>{n}</code> = number)</label>
   <div class="row">
     <select id="curStr"></select>
@@ -297,6 +297,12 @@ function hitPanel(x, y) {
   return -1;
 }
 let drag = null, lastTap = null;
+// Ctrl or Shift held: lock to horizontal / vertical relative to `from`
+const locked = (ev) => ev.ctrlKey || ev.shiftKey || ev.metaKey;
+function ortho(from, x, y) {
+  if (!from) return [x, y];
+  return Math.abs(x - from[0]) >= Math.abs(y - from[1]) ? [x, from[1]] : [from[0], y];
+}
 const stage = $("stage");
 stage.addEventListener("dragstart", (ev) => ev.preventDefault());
 stage.addEventListener("pointerdown", (ev) => {
@@ -315,11 +321,12 @@ stage.addEventListener("pointerdown", (ev) => {
     }
     lastTap = { t: now, x, y };
     if (!S.draft) S.draft = { type: "line", pts: [] };
-    S.draft.pts.push([x, y]); renderDraft();
+    const prev = S.draft.pts[S.draft.pts.length - 1];
+    S.draft.pts.push(locked(ev) ? ortho(prev, x, y) : [x, y]); renderDraft();
   } else {
     S.sel = hitPanel(x, y);
     if (S.sel >= 0) {
-      snapshot(); const p = S.panels[S.sel]; drag = { dx: x - p.x, dy: y - p.y };
+      snapshot(); const p = S.panels[S.sel]; drag = { dx: x - p.x, dy: y - p.y, ox: p.x, oy: p.y };
       try { stage.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
     }
     render();
@@ -329,8 +336,15 @@ stage.addEventListener("pointermove", (ev) => {
   if (!S.draft && !drag) return;
   const [x, y] = pt(ev);
   if (S.draft && S.draft.type === "panel") { S.draft.x1 = x; S.draft.y1 = y; renderDraft(); }
-  else if (S.draft && S.draft.type === "line") { S.draft.cursor = [x, y]; renderDraft(); }
-  else if (drag && S.sel >= 0) { const p = S.panels[S.sel]; p.x = round(x - drag.dx); p.y = round(y - drag.dy); render(); }
+  else if (S.draft && S.draft.type === "line") {
+    S.draft.cursor = locked(ev) ? ortho(S.draft.pts[S.draft.pts.length - 1], x, y) : [x, y]; renderDraft();
+  }
+  else if (drag && S.sel >= 0) {
+    const p = S.panels[S.sel];
+    let nx = round(x - drag.dx), ny = round(y - drag.dy);
+    if (locked(ev)) [nx, ny] = ortho([drag.ox, drag.oy], nx, ny);
+    p.x = nx; p.y = ny; render();
+  }
 });
 function endPointer() {
   if (S.draft && S.draft.type === "panel") {
@@ -342,7 +356,16 @@ function endPointer() {
 }
 stage.addEventListener("pointerup", endPointer);
 stage.addEventListener("pointercancel", () => { if (S.draft && S.draft.type === "panel") { S.draft = null; renderDraft(); } drag = null; });
+let lastMove = null;
+stage.addEventListener("pointermove", (ev) => { lastMove = { clientX: ev.clientX, clientY: ev.clientY }; });
+function refreshCursor(ev) {
+  if (!(S.draft && S.draft.type === "line" && lastMove)) return;
+  const [x, y] = pt(lastMove);
+  S.draft.cursor = locked(ev) ? ortho(S.draft.pts[S.draft.pts.length - 1], x, y) : [x, y]; renderDraft();
+}
+document.addEventListener("keyup", refreshCursor);
 document.addEventListener("keydown", (ev) => {
+  if (["Control", "Shift", "Meta"].includes(ev.key)) { refreshCursor(ev); return; }
   if (ev.target && ev.target.matches && ev.target.matches("input, textarea, select")) return;
   if (ev.key === "Enter") finishLine();
   if (ev.key === "Escape") { S.draft = null; render(); }

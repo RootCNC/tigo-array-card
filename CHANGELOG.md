@@ -8,6 +8,7 @@
 - Double-click reliably finishes a roof line, including over a background image. Also new: **Finish line** and **Cancel line** buttons.
 - Drawing panels no longer stutters or fails with large photos: the image isn't redrawn while you drag, and the
   browser can't start dragging the image itself.
+- Hold **Ctrl** or **Shift** to draw roof lines exactly horizontal or vertical, or to move a panel in a straight line.
 - The canvas scales to fit the window, and new panel ids carry on from the highest existing number after an import.
 
 ## 1.0.0 – first public release
